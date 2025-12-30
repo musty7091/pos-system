@@ -3,17 +3,18 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
-  Wallet, TrendingUp, History, ArrowRightLeft, 
+  Wallet, TrendingUp, History, 
   Banknote, CreditCard, Lock, Calendar, AlertCircle, Loader2,
   PlusCircle, MinusCircle, X, Save
 } from 'lucide-react';
 import { toast } from 'sonner';
+import PrintZReportButton from '@/features/dashboard/components/PrintZReportButton'; // YENİ EKLENDİ
 
 export default function FinancePage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
-  // Anlık Kasa Durumu (Son Z Raporundan sonraki işlemler)
+  // Anlık Kasa Durumu
   const [currentShift, setCurrentShift] = useState({
     startTime: null as string | null,
     totalSales: 0,
@@ -24,11 +25,10 @@ export default function FinancePage() {
     transactionCount: 0
   });
 
-  // Geçmiş ve Ana Kasa
   const [history, setHistory] = useState<any[]>([]);
   const [mainSafeBalance, setMainSafeBalance] = useState(0);
 
-  // Manuel İşlem Modalı State'leri
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'deposit' | 'withdrawal'>('deposit');
   const [manualAmount, setManualAmount] = useState('');
@@ -57,7 +57,7 @@ export default function FinancePage() {
         .select('*, sale_items(*)')
         .gt('created_at', lastZDate);
 
-      // 3. Vardiya İstatistikleri
+      // 3. İstatistikler
       let stats = {
         startTime: lastZ ? lastZ.created_at : null,
         totalSales: 0,
@@ -91,12 +91,11 @@ export default function FinancePage() {
         .from('z_reports')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10); // Son 10 rapor
       setHistory(zHistory || []);
 
-      // 5. ANA KASA BAKİYESİ (DÜZELTİLDİ: Giriş - Çıkış)
+      // 5. Ana Kasa Bakiyesi
       const { data: safeTransactions } = await supabase.from('main_safe_transactions').select('amount, transaction_type');
-      
       let balance = 0;
       safeTransactions?.forEach(t => {
           if (t.transaction_type === 'deposit') balance += Number(t.amount);
@@ -111,7 +110,6 @@ export default function FinancePage() {
     }
   };
 
-  // Z RAPORU ALMA
   const handleCreateZReport = async () => {
     if (currentShift.transactionCount === 0) {
       toast.error('Kasa zaten boş, işlem yok.');
@@ -124,7 +122,6 @@ export default function FinancePage() {
     const loadingToast = toast.loading('Z Raporu oluşturuluyor...');
 
     try {
-      // A. Raporu Kaydet
       const { data: zReport, error: zError } = await supabase
         .from('z_reports')
         .insert([{
@@ -143,7 +140,6 @@ export default function FinancePage() {
 
       if (zError) throw zError;
 
-      // B. Nakit Parayı Ana Kasaya Aktar
       if (currentShift.cashTotal > 0) {
         const { error: safeError } = await supabase
           .from('main_safe_transactions')
@@ -167,7 +163,6 @@ export default function FinancePage() {
     }
   };
 
-  // MANUEL KASA İŞLEMİ (Ekleme / Çıkarma)
   const handleManualTransaction = async () => {
       const amount = parseFloat(manualAmount);
       if (!amount || amount <= 0) {
@@ -175,7 +170,7 @@ export default function FinancePage() {
           return;
       }
       if (!manualDesc) {
-          toast.error('Lütfen bir açıklama giriniz (Örn: Kira Ödemesi)');
+          toast.error('Lütfen bir açıklama giriniz.');
           return;
       }
 
@@ -183,13 +178,12 @@ export default function FinancePage() {
       try {
           const { error } = await supabase.from('main_safe_transactions').insert([{
               amount: amount,
-              transaction_type: modalType, // 'deposit' veya 'withdrawal'
+              transaction_type: modalType,
               source_type: 'manual',
               description: manualDesc
           }]);
 
           if (error) throw error;
-
           toast.success('İşlem başarıyla kaydedildi.');
           setIsModalOpen(false);
           setManualAmount('');
@@ -224,9 +218,7 @@ export default function FinancePage() {
           </p>
         </div>
 
-        {/* ANA KASA KARTI VE BUTONLAR */}
         <div className="flex flex-col md:flex-row gap-4">
-             {/* KASA KARTI */}
             <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-4 min-w-[280px]">
                 <div className="p-3 bg-slate-800 rounded-xl">
                     <Lock size={24} className="text-emerald-400"/>
@@ -237,7 +229,6 @@ export default function FinancePage() {
                 </div>
             </div>
 
-            {/* BUTONLAR */}
             <div className="flex gap-2">
                 <button 
                     onClick={() => openModal('deposit')}
@@ -275,15 +266,25 @@ export default function FinancePage() {
                      Son Z Raporundan ({currentShift.startTime ? new Date(currentShift.startTime).toLocaleString('tr-TR') : 'Başlangıç'}) bu yana.
                    </p>
                 </div>
-                {currentShift.transactionCount > 0 ? (
-                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase animate-pulse">
-                        Aktif
-                    </span>
-                ) : (
-                    <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                        Beklemede
-                    </span>
-                )}
+                {/* X RAPORU YAZDIRMA BUTONU */}
+                <div className="flex gap-2">
+                   {currentShift.transactionCount > 0 && (
+                     <PrintZReportButton 
+                       data={{
+                         title: 'X RAPORU (ANLIK)',
+                         date: new Date().toISOString(),
+                         totalSales: currentShift.totalSales,
+                         cashTotal: currentShift.cashTotal,
+                         cardTotal: currentShift.cardTotal,
+                         creditTotal: currentShift.creditTotal,
+                         profitTotal: currentShift.profitTotal,
+                         transactionCount: currentShift.transactionCount,
+                         isOfficial: false
+                       }}
+                       variant="primary"
+                     />
+                   )}
+                </div>
              </div>
 
              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -323,9 +324,6 @@ export default function FinancePage() {
                {processing ? <Loader2 className="animate-spin"/> : <Lock size={20} />}
                GÜNÜ KAPAT VE Z RAPORU AL
              </button>
-             <p className="text-[10px] text-center text-slate-400 font-bold mt-3">
-               * Çekmecedeki nakit 'Ana Kasa'ya devredilir, sayaçlar sıfırlanır.
-             </p>
           </div>
         </div>
 
@@ -357,7 +355,24 @@ export default function FinancePage() {
                                </p>
                             </div>
                          </div>
-                         <span className="text-sm font-black text-slate-800">₺{z.total_sales.toFixed(2)}</span>
+                         {/* Z RAPORU TEKRAR YAZDIRMA BUTONU */}
+                         <div className="flex items-center gap-2">
+                            <span className="text-sm font-black text-slate-800">₺{z.total_sales.toFixed(2)}</span>
+                            <PrintZReportButton 
+                               data={{
+                                 title: 'Z RAPORU (KOPYA)',
+                                 date: z.created_at,
+                                 totalSales: z.total_sales,
+                                 cashTotal: z.total_cash,
+                                 cardTotal: z.total_card,
+                                 creditTotal: z.total_credit,
+                                 profitTotal: z.total_profit,
+                                 transactionCount: z.transaction_count,
+                                 isOfficial: true
+                               }}
+                               variant="icon"
+                            />
+                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-200/60">
                          <div className="text-[9px] font-bold text-slate-500">
@@ -374,7 +389,6 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {/* MANUEL İŞLEM MODALI */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6">
@@ -384,7 +398,6 @@ export default function FinancePage() {
                     </h3>
                     <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><X size={20}/></button>
                 </div>
-                
                 <div className="space-y-4">
                     <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Tutar</label>
@@ -411,7 +424,6 @@ export default function FinancePage() {
                         />
                     </div>
                 </div>
-
                 <div className="flex gap-3 mt-8">
                     <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold uppercase hover:bg-slate-200">İptal</button>
                     <button 
@@ -430,7 +442,6 @@ export default function FinancePage() {
             </div>
         </div>
       )}
-
     </div>
   );
 }
