@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Sayfa Konteynırı */
+  .page-container {
+    @apply p-6 bg-[#F8FAFC] min-h-screen text-slate-900 font-normal;
+  }
+
+  /* Narin Kartlar */
+  .dash-card {
+    @apply bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden transition-all;
+  }
+
+  /* Narin Etiketler */
+  .label-style {
+    @apply text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block ml-1;
+  }
+
+  /* Standart Giriş Alanları */
+  .input-style {
+    @apply w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none 
+           transition-all duration-200 font-medium text-slate-700 text-sm
+           focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5;
+  }
+
+  /* Ana İşlem Butonları */
+  .btn-primary {
+    @apply bg-blue-600 text-white px-6 py-3 rounded-xl font-bold 
+           shadow-lg shadow-blue-500/10 hover:bg-blue-700 active:scale-95 
+           transition-all flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest;
+  }
+
+  /* Narin Tablo Standartları */
+  .table-head {
+    @apply bg-slate-50/50 border-b border-slate-100 text-slate-400 text-[10px] 
+           uppercase tracking-widest font-bold sticky top-0 z-10;
+  }
+
+  .table-row {
+    @apply hover:bg-slate-50/30 transition-colors border-b border-slate-50;
+  }
+}
